@@ -1,0 +1,6 @@
+# Ignore all files in data directory except .gitignore
+*
+!.gitignore
+
+# But include example files if needed
+!example_*.json

@@ -1,0 +1,14 @@
+# App Store Review Scraper GUI - Requirements
+
+# Core scraping libraries
+gplay-scraper>=0.1.0  # Google Play Store
+app-store-scraper>=0.3.5  # Apple App Store
+
+# GUI framework
+customtkinter>=5.2.0
+
+# Data manipulation (for future CSV export)
+pandas>=2.0.0
+
+# Additional dependencies for gplay-scraper
+curl-cffi>=0.5.0
