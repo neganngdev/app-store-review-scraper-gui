@@ -188,6 +188,26 @@ class AppScraperGUI:
             variable=self.text_only_var
         )
         self.text_only_checkbox.pack(side="left")
+        
+        # Output format selection
+        output_frame = ctk.CTkFrame(input_frame)
+        output_frame.pack(fill="x", padx=10, pady=5)
+        
+        ctk.CTkLabel(
+            output_frame,
+            text="Output Format:",
+            width=120,
+            anchor="w"
+        ).pack(side="left", padx=(0, 10))
+        
+        self.output_format_var = ctk.StringVar(value="Full")
+        self.output_format_menu = ctk.CTkOptionMenu(
+            output_frame,
+            variable=self.output_format_var,
+            values=["Full", "Text only", "Title + Text"],
+            width=150
+        )
+        self.output_format_menu.pack(side="left")
     
     def _create_button_section(self, parent):
         """Create the action buttons section."""
@@ -456,8 +476,12 @@ class AppScraperGUI:
                 self.current_data = result
                 self.data_type = "reviews"
                 
+                # Apply output formatting
+                output_format = self.output_format_var.get()
+                formatted_result = self._format_output(result, output_format)
+                
                 # Display formatted JSON
-                json_str = json.dumps(result, indent=2, ensure_ascii=False)
+                json_str = json.dumps(formatted_result, indent=2, ensure_ascii=False)
                 self._update_output(json_str)
                 
                 # Create informative message
@@ -484,19 +508,6 @@ class AppScraperGUI:
         inputs = self._get_input_values()
         
         if not self._validate_inputs(inputs):
-            return
-        
-        # Ask user which countries to fetch from
-        countries_str = messagebox.askquestion(
-            "Multi-Country Fetching",
-            "Fetch reviews from multiple countries?\n\n"
-            "This will search: US, KR, JP, GB, DE, FR, IN, BR\n"
-            "and remove duplicates.\n\n"
-            "This may take a minute...",
-            icon='question'
-        )
-        
-        if countries_str != 'yes':
             return
         
         # Disable buttons during operation
@@ -534,8 +545,12 @@ class AppScraperGUI:
                 self.current_data = result
                 self.data_type = "reviews_multi_country"
                 
+                # Apply output formatting
+                output_format = self.output_format_var.get()
+                formatted_result = self._format_output(result, output_format)
+                
                 # Display formatted JSON
-                json_str = json.dumps(result, indent=2, ensure_ascii=False)
+                json_str = json.dumps(formatted_result, indent=2, ensure_ascii=False)
                 self._update_output(json_str)
                 
                 text_only_note = " (text only)" if inputs["text_only"] else ""
@@ -595,6 +610,42 @@ class AppScraperGUI:
         """Update the output text box."""
         self.output_text.delete("1.0", "end")
         self.output_text.insert("1.0", text)
+    
+    def _format_output(self, data: Any, output_format: str) -> Any:
+        """Format the output data based on selected format.
+        
+        Args:
+            data: The data to format (can be list of reviews or app info)
+            output_format: "Full", "Text only", or "Title + Text"
+        
+        Returns:
+            Formatted data
+        """
+        # If it's app info or error, return as-is
+        if isinstance(data, dict):
+            return data
+        
+        # If it's not a list of reviews, return as-is
+        if not isinstance(data, list) or not data:
+            return data
+        
+        # Check if first item is an error
+        if "error" in data[0]:
+            return data
+        
+        # Apply formatting based on selection
+        if output_format == "Text only":
+            return [{"text": review.get("text", "")} for review in data]
+        elif output_format == "Title + Text":
+            return [
+                {
+                    "title": review.get("title", ""),
+                    "text": review.get("text", "")
+                }
+                for review in data
+            ]
+        else:  # Full
+            return data
     
     def _show_status(self, message: str, status_type: str = "normal"):
         """Show status message above results.
