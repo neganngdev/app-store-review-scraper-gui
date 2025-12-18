@@ -12,6 +12,7 @@ from app import engine as playstore_engine
 from app import appstore_engine
 from app.engine import validate_app_id
 from app.appstore_engine import validate_app_name
+from deep_translator import GoogleTranslator
 
 
 class AppScraperGUI:
@@ -187,7 +188,15 @@ class AppScraperGUI:
             text="Only reviews with text/description",
             variable=self.text_only_var
         )
-        self.text_only_checkbox.pack(side="left")
+        self.text_only_checkbox.pack(side="left", padx=(0, 20))
+        
+        self.translate_var = ctk.BooleanVar(value=False)
+        self.translate_checkbox = ctk.CTkCheckBox(
+            filter_frame,
+            text="Translate to English",
+            variable=self.translate_var
+        )
+        self.translate_checkbox.pack(side="left")
         
         # Output format selection
         output_frame = ctk.CTkFrame(input_frame)
@@ -341,7 +350,8 @@ class AppScraperGUI:
             "count": count,
             "sort": sort_by,
             "platform": platform,
-            "text_only": text_only
+            "text_only": text_only,
+            "translate": self.translate_var.get()
         }
     
     def _validate_inputs(self, inputs: Dict[str, Any]) -> bool:
@@ -476,6 +486,12 @@ class AppScraperGUI:
                 self.current_data = result
                 self.data_type = "reviews"
                 
+                # Apply translation if requested
+                if inputs["translate"]:
+                    self._show_status("🔄 Translating reviews to English...", "warning")
+                    self.window.update()
+                    result = self._translate_reviews(result)
+                
                 # Apply output formatting
                 output_format = self.output_format_var.get()
                 formatted_result = self._format_output(result, output_format)
@@ -488,8 +504,9 @@ class AppScraperGUI:
                 actual_count = len(result)
                 requested_count = inputs["count"]
                 text_only_note = " (text only)" if inputs["text_only"] else ""
+                translate_note = " (translated)" if inputs["translate"] else ""
                 
-                message = f"✅ Successfully fetched {actual_count} reviews{text_only_note}"
+                message = f"✅ Successfully fetched {actual_count} reviews{text_only_note}{translate_note}"
                 if actual_count < requested_count:
                     message += f" (requested {requested_count}). Try multi-country for more reviews."
                 
@@ -545,6 +562,12 @@ class AppScraperGUI:
                 self.current_data = result
                 self.data_type = "reviews_multi_country"
                 
+                # Apply translation if requested
+                if inputs["translate"]:
+                    self._show_status("🔄 Translating reviews to English...", "warning")
+                    self.window.update()
+                    result = self._translate_reviews(result)
+                
                 # Apply output formatting
                 output_format = self.output_format_var.get()
                 formatted_result = self._format_output(result, output_format)
@@ -554,9 +577,10 @@ class AppScraperGUI:
                 self._update_output(json_str)
                 
                 text_only_note = " (text only)" if inputs["text_only"] else ""
+                translate_note = " (translated)" if inputs["translate"] else ""
                 # Show success message
                 self._show_status(
-                    f"✅ Successfully fetched {len(result)} unique reviews{text_only_note} from multiple countries! "
+                    f"✅ Successfully fetched {len(result)} unique reviews{text_only_note}{translate_note} from multiple countries! "
                     f"Each review has a 'fetched_from_country' field.",
                     "success"
                 )
@@ -646,6 +670,45 @@ class AppScraperGUI:
             ]
         else:  # Full
             return data
+    
+    def _translate_reviews(self, data: Any) -> Any:
+        """Translate review text and titles to English.
+        
+        Args:
+            data: The data to translate (list of reviews or app info)
+        
+        Returns:
+            Translated data
+        """
+        # If it's app info, error, or not a list, return as-is
+        if isinstance(data, dict) or not isinstance(data, list) or not data:
+            return data
+        
+        # Check if first item is an error
+        if "error" in data[0]:
+            return data
+        
+        translator = GoogleTranslator(source='auto', target='en')
+        translated_data = []
+        
+        for review in data:
+            translated_review = review.copy()
+            
+            try:
+                # Translate text if present
+                if "text" in review and review["text"]:
+                    translated_review["text"] = translator.translate(review["text"])
+                
+                # Translate title if present
+                if "title" in review and review["title"]:
+                    translated_review["title"] = translator.translate(review["title"])
+            except Exception as e:
+                # If translation fails, keep original text
+                pass
+            
+            translated_data.append(translated_review)
+        
+        return translated_data
     
     def _show_status(self, message: str, status_type: str = "normal"):
         """Show status message above results.
